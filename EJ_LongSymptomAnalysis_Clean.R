@@ -1,6 +1,6 @@
 ################################################################################
 #                         LONGITUDINAL SYMPTOMS ANALYSES
-# Last Updated: October 3, 2025
+# Last Updated: August 12
 # By: Esther Jung
 ################################################################################
 
@@ -14,8 +14,8 @@ library(lmtest)
 library(dplyr)
 library(broom)
 
-load("data/symptom_details_long.RData")
-load("data/model_data.RData")
+# load("data/symptom_details_long1.RData")
+# load("data/model_data1.RData")
 
 table(model_data$TBincidence1)
 table(model_data$tb_dx)
@@ -24,7 +24,8 @@ table(model_data$tb_dx)
 
 table1 <- model_data %>%
   mutate(
-    TBincidence1 = factor(TBincidence1, levels = c("No", "Yes"), labels = c("No TB", "TB")))
+    TBincidence1 = factor(TBincidence1, levels = c("No", "Yes"), labels = c("No TB", "TB"))
+  )
 
 table1_baseline <- table1 %>%
   group_by(record_id) %>%
@@ -57,7 +58,7 @@ table1 <- table1_baseline %>%
     )
   ) %>%
   add_p(
-    test = where(is.factor) ~ "chisq.test"  
+    test = where(is.factor) ~ "chisq.test"
   ) %>%
   add_overall()
 
@@ -77,6 +78,16 @@ chisq.test(table1_baseline$symptomatic_cellmates, table1_baseline$transition)
 chisq.test(table1_baseline$tb_dx, table1_baseline$transition)
 table(table1_baseline$tb_dx, table1_baseline$transition)
 
+library(gtsummary)
+library(flextable)
+library(officer)
+
+table1_flex <- as_flex_table(table1)
+doc <- read_docx() %>%
+  body_add_flextable(table1_flex) %>%
+  body_add_par(" ")
+print(doc, target = "table1.docx")
+
 #### Predictors of the change ==================================================
 library(dplyr)
 library(sandwich)
@@ -85,7 +96,7 @@ library(broom)
 
 ## 1. Predictors of becoming symptomatic (A-S vs A-A)
 asymp_data <- model_data %>%
-  filter(symptom_lag == 0) %>%  # started asymptomatic
+  filter(symptom_lag == 0) %>% # started asymptomatic
   mutate(
     change_binary = ifelse(transition == "A-S", 1, 0),
     LunitTB = ifelse(LunitTB < 50, "Normal", "Abnormal"),
@@ -117,7 +128,7 @@ table_asymp <- broom::tidy(robust_asymp) %>%
 
 ## 2. Predictors of becoming asymptomatic (S-A vs S-S)
 symp_data <- model_data %>%
-  filter(symptom_lag == 1) %>%  # started symptomatic
+  filter(symptom_lag == 1) %>% # started symptomatic
   mutate(
     change_binary = ifelse(transition == "S-A", 1, 0),
     LunitTB = ifelse(LunitTB < 50, "Normal", "Abnormal"),
@@ -156,8 +167,10 @@ table_symp
 # Recode symptoms to binary inside symptom_details_long
 symptom_details_long <- symptom_details_long %>%
   mutate(across(
-    c(cough, sputum, blood, fever, appetite,
-      weightloss, sweats, chestpain, breathing, bloodysputum),
+    c(
+      cough, sputum, blood, fever, appetite,
+      weightloss, sweats, chestpain, breathing, bloodysputum
+    ),
     ~ case_when(
       . %in% c("Yes", "Any", 1) ~ 1,
       . %in% c("No", "None", 0) ~ 0,
@@ -167,11 +180,12 @@ symptom_details_long <- symptom_details_long %>%
   mutate(sum_symptoms = as.numeric(sum_symptoms)) %>%
   group_by(record_id) %>%
   arrange(visit_num, .by_group = TRUE) %>%
-  
   # Lag variables (baseline = visit 0 now included!)
   mutate(across(
-    c(cough, sputum, blood, fever, appetite,
-      weightloss, sweats, chestpain, breathing, bloodysputum),
+    c(
+      cough, sputum, blood, fever, appetite,
+      weightloss, sweats, chestpain, breathing, bloodysputum
+    ),
     list(
       lag = ~ lag(.),
       change = ~ case_when(
@@ -184,7 +198,6 @@ symptom_details_long <- symptom_details_long %>%
     ),
     .names = "{.col}_{.fn}"
   )) %>%
-  
   mutate(
     sum_symptoms_lag = lag(sum_symptoms),
     sum_symptoms_change = sum_symptoms - sum_symptoms_lag
@@ -211,9 +224,11 @@ symptom_change_summary <- symptom_details_long %>%
   filter(!is.na(change))
 
 denoms <- tibble::tibble(
-  transition = c("A-S", 
-                 "S-S", 
-                 "S-A"),
+  transition = c(
+    "A-S",
+    "S-S",
+    "S-A"
+  ),
   denom = c(1092, 755, 1025)
 )
 
@@ -230,15 +245,16 @@ symptom_change_pct_clean <- symptom_change_summary %>%
   filter(!is.na(transition)) %>%
   mutate(
     symptom = recode(symptom,
-                     weightloss = "Weight loss",
-                     sweats = "Night sweats",
-                     fever = "Fever",
-                     cough = "Cough",
-                     sputum = "Productive cough",
-                     chestpain = "Chest pain",
-                     breathing = "Breathing trouble",
-                     bloodysputum = "Blood in sputum",
-                     appetite = "Appetite")
+      weightloss = "Weight loss",
+      sweats = "Night sweats",
+      fever = "Fever",
+      cough = "Cough",
+      sputum = "Productive cough",
+      chestpain = "Chest pain",
+      breathing = "Breathing trouble",
+      bloodysputum = "Blood in sputum",
+      appetite = "Appetite"
+    )
   )
 symptom_change_pct_clean
 
@@ -264,33 +280,35 @@ symptom_change_pct_clean <- symptom_change_pct_clean %>%
   mutate(symptom = factor(symptom, levels = symptom_order)) %>%
   mutate(transition = factor(transition, levels = transition_order))
 
-symptom_heatmap<- ggplot(symptom_change_pct_clean, aes(x = symptom, y = transition, fill = pct)) +
-  geom_tile(color = "white",) +
+symptom_heatmap <- ggplot(symptom_change_pct_clean, aes(x = symptom, y = transition, fill = pct)) +
+  geom_tile(color = "white", ) +
   geom_text(
-    aes(label = ifelse(pct >=1, paste0(round(pct), "%"), "")), 
-    color = "black", size = 3, fontface = "bold") +
+    aes(label = ifelse(pct >= 1, paste0(round(pct), "%"), "")),
+    color = "black", size = 3, fontface = "bold"
+  ) +
   scale_fill_gradient2(
     low = "white", mid = "lightsalmon", high = "firebrick3",
     midpoint = 30, limits = c(0, max(symptom_change_pct_clean$pct, na.rm = TRUE))
-  ) +  
+  ) +
   scale_y_discrete(labels = c(
     "S-A" = "Symptomatic to Asymptomatic",
     "S-S" = "Symptomatic to Symptomatic",
-    "A-S" = "Asymptomatic to Symptomatic")) +
+    "A-S" = "Asymptomatic to Symptomatic"
+  )) +
   labs(
     x = "Symptom",
     y = "Symptom transition",
     fill = "% change"
   ) +
-  coord_fixed(ratio = 0.8) +  
+  coord_fixed(ratio = 0.8) +
   theme_minimal(base_size = 14) +
   theme(
-    text = element_text(color = "black"),        # all text black
+    text = element_text(color = "black"), # all text black
     axis.text.x = element_text(angle = 45, hjust = 1, color = "black", size = 14),
     axis.text.y = element_text(color = "black", size = 14),
     axis.title.x = element_text(color = "black", size = 14, face = "bold"),
     axis.title.y = element_text(color = "black", size = 14, face = "bold"),
-    legend.text  = element_text(color = "black", size = 14),
+    legend.text = element_text(color = "black", size = 14),
     legend.title = element_text(color = "black", size = 14),
     panel.grid = element_blank()
   )
@@ -299,10 +317,10 @@ symptom_heatmap
 ggsave(
   filename = "~/Dropbox/TB-R01-Brazil/figures/longsymptoms_symptomheatmap.png",
   plot = symptom_heatmap,
-  width = 10,    # inches
-  height = 4,   # inches
-  dpi = 800    
-) 
+  width = 10, # inches
+  height = 4, # inches
+  dpi = 800
+)
 
 
 # Symptom count change stratified by transition
@@ -349,9 +367,9 @@ plot_data <- tidy_results %>%
   filter(str_detect(term, "transition")) %>%
   mutate(
     transition = case_when(
-      term == "transitionA-S"  ~ "Asymptomatic → Symptomatic",
-      term == "transitionS-S"   ~ "Symptomatic → Symptomatic",
-      term == "transitionS-A"  ~ "Symptomatic → Asymptomatic",
+      term == "transitionA-S" ~ "Asymptomatic → Symptomatic",
+      term == "transitionS-S" ~ "Symptomatic → Symptomatic",
+      term == "transitionS-A" ~ "Symptomatic → Asymptomatic",
       TRUE ~ term
     ),
     transition = factor(transition, levels = c("Asymptomatic → Symptomatic", "Symptomatic → Symptomatic", "Symptomatic → Asymptomatic"))
@@ -386,60 +404,62 @@ dark_colors <- c(
   "Symptomatic → Asymptomatic" = "#D95F02"
 )
 
-plot_tb_main <- ggplot(plot_data_dummy, aes(x = RR, y = transition, color = transition)) + 
-  geom_point(shape = 15, size = 3, na.rm = TRUE) + 
-  geom_errorbarh(aes(xmin = lower_CI, xmax = upper_CI), height = 0.2, na.rm = TRUE) + 
-  geom_vline(xintercept = 1, color = "gray40", alpha = 0.3, linetype = "dashed") + 
+plot_tb_main <- ggplot(plot_data_dummy, aes(x = RR, y = transition, color = transition)) +
+  geom_point(shape = 15, size = 3, na.rm = TRUE) +
+  geom_errorbarh(aes(xmin = lower_CI, xmax = upper_CI), height = 0.2, na.rm = TRUE) +
+  geom_vline(xintercept = 1, color = "gray40", alpha = 0.3, linetype = "dashed") +
   scale_x_continuous(
-    limits = c(0.5, 3.5), 
-    breaks = seq(0.5, 3.5, by = .5)  # set tick positions
-  ) + 
-  labs(x = "Adjusted Risk Ratio (95% CI)", y = NULL) + 
-  scale_color_manual(values = dark_colors) +  # apply darker colors
-  theme_minimal(base_size = 12, base_family = "Arial") + 
+    limits = c(0.5, 3.5),
+    breaks = seq(0.5, 3.5, by = .5) # set tick positions
+  ) +
+  labs(x = "Adjusted Risk Ratio (95% CI)", y = NULL) +
+  scale_color_manual(values = dark_colors) + # apply darker colors
+  theme_minimal(base_size = 12, base_family = "Arial") +
   theme(
     axis.text.y = element_blank(),
-    axis.text.x = element_text(size = 10, color = "black"), 
-    axis.title = element_text(size = 12), 
+    axis.text.x = element_text(size = 10, color = "black"),
+    axis.title = element_text(size = 12),
     panel.grid.minor = element_blank(),
     panel.grid.major.y = element_blank(),
     panel.grid.major.x = element_blank(),
-    axis.line.x = element_line(color = "black", size = 0.5), 
+    axis.line.x = element_line(color = "black", size = 0.5),
     axis.ticks.x = element_line(color = "black"),
-    axis.ticks.length = unit(2, "mm"),  
-    legend.position = "none")
+    axis.ticks.length = unit(2, "mm"),
+    legend.position = "none"
+  )
 
 plot_tb_main
 
 ggsave(
   filename = "~/Dropbox/TB-R01-Brazil/figures/longsymptoms_forestplot.png",
   plot = plot_tb_main,
-  width = 5,    # inches
-  height = 2,   # inches
-  dpi = 1000    
-) 
+  width = 5, # inches
+  height = 2, # inches
+  dpi = 1000
+)
 
 #### Kaplan Meier Curves =======================================================
 
 baseline_data <- model_data %>%
   group_by(record_id) %>%
-  slice(1) %>%   # take first row of each record_id
+  slice(1) %>% # take first row of each record_id
   transmute(
     record_id,
     TBincidence1,
     TBincidence2,
     visit = "symptoms_0",
-    symptom_status = ifelse(symptom_lag == 1, "Any", "None"), 
+    symptom_status = ifelse(symptom_lag == 1, "Any", "None"),
     visit_num = 0,
-    symptom_binary = symptom_lag,   # baseline = lagged symptom status
-    symptom_lag = NA,             
-    transition = NA            
+    symptom_binary = symptom_lag, # baseline = lagged symptom status
+    symptom_lag = NA,
+    transition = NA
   ) %>%
   mutate(record_id = as.character(record_id))
 
 model_data_long <- bind_rows(
   baseline_data %>% mutate(across(everything(), as.character)),
-  model_data %>% mutate(across(everything(), as.character))) %>%
+  model_data %>% mutate(across(everything(), as.character))
+) %>%
   arrange(record_id, visit_num) %>%
   mutate(
     visit_num = as.numeric(visit_num),
@@ -473,9 +493,9 @@ visit_props <- first_switch %>%
       mutate(
         total_pop = sum(bs$n_visits > visit_num),
         n_at_risk = sum((is.na(bs$first_change_visit) | bs$first_change_visit > visit_num) & bs$n_visits > visit_num),
-        n_events  = ifelse(visit_num == 0, 0, sum(bs$first_change_visit == visit_num, na.rm = TRUE)),
+        n_events = ifelse(visit_num == 0, 0, sum(bs$first_change_visit == visit_num, na.rm = TRUE)),
         prop_event = ifelse(visit_num == 0, 0, n_events / (n_events + n_at_risk)),
-        sp = ifelse(visit_num == 0, 1,  (n_at_risk)/(total_pop))
+        sp = ifelse(visit_num == 0, 1, (n_at_risk) / (total_pop))
       )
   }) %>%
   ungroup()
@@ -495,7 +515,7 @@ p_asym <- ggplot(
 ) +
   geom_step(color = "blue3", size = 1.5) +
   scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1)) +
-  scale_x_continuous(breaks = unique(km_curves$visit_num)) + 
+  scale_x_continuous(breaks = unique(km_curves$visit_num)) +
   labs(
     title = "Started Asymptomatic",
     x = "Visit Number",
@@ -509,7 +529,7 @@ p_asym <- ggplot(
     axis.text = element_text(color = "black"),
     plot.title = element_text(hjust = 0.5, size = 12),
     axis.title = element_text(size = 12),
-    axis.text.x = element_text(size = 8, color = "black"), 
+    axis.text.x = element_text(size = 8, color = "black"),
     axis.text.y = element_text(size = 8, color = "black")
   )
 
@@ -518,9 +538,9 @@ ever_symptomatic <- long_with_baseline %>%
   group_by(record_id) %>%
   summarise(
     baseline_symptom = first(baseline_symptom),
-    ever_symptom = any(symptom_binary == 1, na.rm = TRUE)  # ever had symptoms
+    ever_symptom = any(symptom_binary == 1, na.rm = TRUE) # ever had symptoms
   ) %>%
-  filter(baseline_symptom == 0)   # only those starting asymptomatic
+  filter(baseline_symptom == 0) # only those starting asymptomatic
 
 # Count and proportion
 table_asym <- ever_symptomatic %>%
@@ -539,7 +559,7 @@ p_sym <- ggplot(
 ) +
   geom_step(color = "red3", size = 1.5) +
   scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1)) +
-  scale_x_continuous(breaks = unique(km_curves$visit_num)) +  
+  scale_x_continuous(breaks = unique(km_curves$visit_num)) +
   labs(
     title = "Started Symptomatic",
     x = "Visit Number",
@@ -553,7 +573,7 @@ p_sym <- ggplot(
     axis.text = element_text(color = "black"),
     plot.title = element_text(hjust = 0.5, size = 12),
     axis.title = element_text(size = 12),
-    axis.text.x = element_text(size = 8, color = "black"), 
+    axis.text.x = element_text(size = 8, color = "black"),
     axis.text.y = element_text(size = 8, color = "black")
   )
 
@@ -691,3 +711,179 @@ tidy_prevtb <- tidy(poisson_model_tb, conf.int = TRUE) %>%
   )
 
 print(tidy_prevtb)
+
+#### LME4 GLMM Logistic ========================================================
+# # Crude
+# summary(glmer(tb_dx ~ transition + (1|record_id), data = model_data, family = binomial()))
+#
+# # Adjusted
+# model_mixed <- glmer(
+#   tb_dx ~ transition + age + prison + prev_tb + smoking + any_drugs + prison_time + (1 | record_id),
+#   data = model_data_complete,
+#   family = binomial()
+# )
+# summary(model_mixed)
+# exp(cbind(OR = fixef(model_mixed), confint(model_mixed, method = "Wald")))
+#
+# model_data_complete <- model_data %>%
+#   select(tb_dx, transition, age, prison, prev_tb, smoking, any_drugs, prison_time, record_id) %>%
+#   na.omit() %>%
+#   mutate(
+#     transition = factor(transition),
+#     prison = factor(prison),
+#     prev_tb = factor(prev_tb),
+#     smoking = factor(smoking),
+#     any_drugs = factor(any_drugs)
+#   )
+
+#### Bayesian GLMM Logistic ====================================================
+
+# model_stan <- stan_glmer(
+#   tb_dx ~ transition + age + prison + prev_tb + smoking + any_drugs + prison_time + (1 | record_id),
+#   data = model_data_complete,
+#   family = binomial(link = "logit"),
+#   prior = normal(0, 2.5),
+#   prior_intercept = normal(0, 5),
+#   chains = 4,
+#   iter = 2000,
+#   cores = 4,
+#   seed = 123
+# # )
+#
+# library(broom.mixed)
+# library(dplyr)
+#
+# # Extract tidy summary of fixed effects
+# tidy_results <- tidy(model_stan, effects = "fixed")
+#
+# # Compute OR, Wald 95% CI, and pseudo p-value
+# tidy_results <- tidy_results %>%
+#   mutate(
+#     p_value = 2 * (1 - pnorm(abs(estimate / std.error))),  # Two-tailed Wald p-value
+#     OR = exp(estimate),
+#     lower_CrI = exp(estimate - 1.96 * std.error),  # Wald CI lower
+#     upper_CrI = exp(estimate + 1.96 * std.error)   # Wald CI upper
+#   )
+#
+# print(tidy_results)
+#### Added Feb 2026: Model adjusted for LunitTB at start of interval (time-varying) ====
+
+# Ensure libraries are loaded
+library(sandwich)
+library(lmtest)
+library(broom)
+library(dplyr)
+
+print("Running Poisson model with adjustment for LunitTB_start (time-varying X-ray)...")
+
+# Create categorical version of time-varying X-ray (Cutoff 50)
+model_data <- model_data %>%
+  mutate(
+    LunitTB_start_cat = case_when(
+      LunitTB_start >= 50 ~ "Abnormal",
+      LunitTB_start < 50 ~ "Normal",
+      TRUE ~ NA_character_
+    ) %>% factor(levels = c("Normal", "Abnormal"))
+  )
+
+# Poisson model replacing baseline 'LunitTB' with 'LunitTB_start_cat'
+poisson_model_tv_xray <- glm(
+  tb_dx ~ transition + age + prison + prev_tb + smoking + any_drugs + prison_time + symptomatic_cellmates + tb_contact + LunitTB_start_cat,
+  data = model_data,
+  family = poisson(link = "log")
+)
+
+# Compute cluster-robust standard errors
+clustered_se_tv <- vcovCL(poisson_model_tv_xray, cluster = ~record_id)
+
+# Tidy results
+tidy_results_tv <- coeftest(poisson_model_tv_xray, vcov = clustered_se_tv) %>%
+  broom::tidy() %>%
+  mutate(
+    RR = exp(estimate),
+    lower_CI = exp(estimate - 1.96 * std.error),
+    upper_CI = exp(estimate + 1.96 * std.error)
+  )
+
+print("Results for Time-Varying X-ray Adjustment (Categorized Normal/Abnormal):")
+print(tidy_results_tv)
+
+# Visualize Time-Varying X-ray Adjusted Model
+library(ggplot2)
+library(stringr)
+
+plot_data_tv <- tidy_results_tv %>%
+  filter(str_detect(term, "transition")) %>%
+  mutate(
+    transition = case_when(
+      term == "transitionA-S" ~ "Asymptomatic → Symptomatic",
+      term == "transitionS-S" ~ "Symptomatic → Symptomatic",
+      term == "transitionS-A" ~ "Symptomatic → Asymptomatic",
+      TRUE ~ term
+    ),
+    transition = factor(transition, levels = c("Asymptomatic → Symptomatic", "Symptomatic → Symptomatic", "Symptomatic → Asymptomatic"))
+  )
+
+dummy_row <- data.frame(
+  term       = NA,
+  estimate   = NA,
+  std.error  = NA,
+  statistic  = NA,
+  p.value    = NA,
+  RR         = NA,
+  lower_CI   = NA,
+  upper_CI   = NA,
+  transition = "Reference"
+)
+
+plot_data_dummy_tv <- rbind(dummy_row, plot_data_tv)
+
+plot_data_dummy_tv$transition <- factor(
+  plot_data_dummy_tv$transition,
+  levels = c(
+    "Symptomatic → Asymptomatic",
+    "Symptomatic → Symptomatic",
+    "Asymptomatic → Symptomatic",
+    "Reference"
+  )
+)
+
+dark_colors <- c(
+  "Asymptomatic → Symptomatic" = "#1C7E50",
+  "Symptomatic → Symptomatic" = "#7570B3",
+  "Symptomatic → Asymptomatic" = "#D95F02"
+)
+
+plot_tb_main_tv <- ggplot(plot_data_dummy_tv, aes(x = RR, y = transition, color = transition)) +
+  geom_point(shape = 15, size = 3, na.rm = TRUE) +
+  geom_errorbarh(aes(xmin = lower_CI, xmax = upper_CI), height = 0.2, na.rm = TRUE) +
+  geom_vline(xintercept = 1, color = "gray40", alpha = 0.3, linetype = "dashed") +
+  scale_x_continuous(
+    limits = c(0.5, 3.5),
+    breaks = seq(0.5, 3.5, by = .5) # set tick positions
+  ) +
+  labs(x = "Adjusted Risk Ratio (95% CI)", y = NULL) +
+  scale_color_manual(values = dark_colors) + # apply darker colors
+  theme_minimal(base_size = 12, base_family = "Arial") +
+  theme(
+    axis.text.y = element_blank(),
+    axis.text.x = element_text(size = 10, color = "black"),
+    axis.title = element_text(size = 12),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    axis.line.x = element_line(color = "black", size = 0.5),
+    axis.ticks.x = element_line(color = "black"),
+    axis.ticks.length = unit(2, "mm"),
+    legend.position = "none"
+  )
+
+print(plot_tb_main_tv)
+
+ggsave(
+  filename = "~/Dropbox/TB-R01-Brazil/figures/longsymptoms_forestplot_TV_adj.png",
+  plot = plot_tb_main_tv,
+  width = 5, # inches
+  height = 2, # inches
+  dpi = 1000
+)
